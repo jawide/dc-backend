@@ -1,0 +1,15 @@
+version: '3'
+services:
+  dc-backend:
+    build:
+      context: .
+    image: jawide/dc-backend
+    restart: always
+    container_name: dc-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - log:/app/log
+
+volumes:
+  log: {}
