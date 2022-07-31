@@ -1,15 +1,26 @@
+from datetime import timedelta
 import json
+import os
 import threading
+from uuid import uuid1
 from flask import Flask, request, Response
 from flask_cors import CORS
 from flask_httpauth import HTTPBasicAuth
 import shelve
+import redis
 import util
+
+
+REDIS_HOST = os.environ.get('REDIS_HOST') or 'localhost'
+REDIS_PORT = os.environ.get('REDIS_PORT') or 6379
+REDIS_DB = os.environ.get('REDIS_DB') or 0
+
 
 app = Flask(__name__)
 CORS(app)
 auth = HTTPBasicAuth()
 db_write_lock = threading.Lock()
+r = redis.StrictRedis(REDIS_HOST, REDIS_PORT, REDIS_DB)
 
 
 @app.errorhandler(util.LackJSONParameter)
@@ -89,7 +100,8 @@ def update(name):
 def select(name):
     with shelve.open('data/software', "c") as data:
         try:
-            return data[name]['content']
+            info = data.get(name) or json.loads(r.get(name))
+            return info['content']
         except KeyError:
             return Response('Not found', 400)
 
@@ -97,7 +109,7 @@ def select(name):
 def info(name):
     with shelve.open('data/software', "c") as data:
         try:
-            res = data[name]
+            res = data.get(name) or json.loads(r.get(name))
             del res['content']
             return json.dumps(res)
         except KeyError:
@@ -107,3 +119,16 @@ def info(name):
 def listall():
     with shelve.open('data/software', "c") as data:
         return json.dumps(list(map(str, data.keys())))
+
+@app.route('/software/temp', methods=['POST'])
+def temp():
+    name = str(uuid1())
+    description = util.get_from_json(request.json, 'description')
+    content = util.get_from_json(request.json, 'content')
+    r.set(name, json.dumps({
+        'description': description,
+        'content': content
+    }), timedelta(minutes=5))
+    return json.dumps({
+        'name': name
+    })

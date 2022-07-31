@@ -9,6 +9,8 @@ class LackJSONParameter(Exception):
         super().__init__('Lack json parameter "{}"'.format('.'.join(names[:index+1])))
 
 def get_from_json(json, *names):
+    if json is None:
+        raise LackJSONParameter(['...'], 0)
     c = json
     for i, name in enumerate(names):
         try:
